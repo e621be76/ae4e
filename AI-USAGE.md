@@ -39,6 +39,11 @@
 - **"Default-deny blocks DNS" looked false at first.** A test pod under default-deny resolved the Service name fine, which suggested the DNS
   allow rule was unnecessary. Instead of deleting the rule, I ran a pod that sleeps 20 s before the lookup: then DNS times out. kube-router programs
   a new pod's rules a few seconds after it starts. The DNS rule stays; without it the smoke test would pass or fail depending on timing.
+- **GitOps bump deployed `latest`.** The first green pipeline committed `tag: latest` to `chart/values.yaml`: `docker/metadata-action`'s
+  `version` output picks the highest-priority tag, and raw tags outrank `type=sha` by default. Caught by reading the bot's commit, not
+  just the green checkmark. Fixed with `priority=1000` on the sha tag; the next run committed `sha-043bab2`.
+- **First CI run was red on the AI's own Karpenter example**, a Deployment with no `securityContext` (writable root filesystem, root user).
+  The gate did its job, and the example now shows the hardened pod spec with `emptyDir` scratch space.
 - **Semgrep can't parse Helm templates.** The first scan reported the chart as "syntax errors" and silently scanned nothing in it. Now CI scans the
   rendered chart, verified by injecting `privileged: true` and confirming the job fails.
 - **One false positive suppressed on purpose:** `math/rand` for picking a quote. Annotated `nosemgrep` with the reason rather than switching to
