@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# install ArgoCD and let it sync chart/ from this repo; ends with a curl through the ingress
+# shellcheck source=scripts/lib.sh
+. "$(dirname "$0")/lib.sh"
+wait_bootstrap
+
+# the Application must point at a public repo; default to the origin of this clone (https form)
+REPO_URL=${REPO_URL:-$(git -C /work remote get-url origin 2>/dev/null | sed -E 's#^git@([^:]+):#https://\1/#' || true)}
+REVISION=${REVISION:-$(git -C /work rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)}
+[ -n "$REPO_URL" ] || { echo "no git remote 'origin' found; set REPO_URL=https://github.com/<you>/<repo>" >&2; exit 1; }
+
+log "installing ArgoCD"
+helm repo add argo https://argoproj.github.io/argo-helm --force-update >/dev/null
+helm upgrade --install argocd argo/argo-cd --version 10.11.6 \
+  --namespace argocd --create-namespace \
+  --set dex.enabled=false --set notifications.enabled=false \
+  --wait --timeout 10m
+
+log "applying Application: $REPO_URL @ $REVISION"
+sed -e "s#REPO_URL#${REPO_URL}#" -e "s#REVISION#${REVISION}#" /work/argocd/quote-api.yaml | kubectl apply -f -
+
+log "waiting for ArgoCD to sync and the app to become healthy"
+kubectl -n argocd wait application/quote-api --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s
+kubectl -n argocd wait application/quote-api --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s
+# HPA starts the deployment at 1 replica and scales to minReplicas shortly after
+kubectl -n quote wait hpa/quote-api --for=jsonpath='{.status.currentReplicas}'=3 --timeout=180s
+kubectl -n quote rollout status deployment/quote-api --timeout=180s
+
+log "placement (expect 2 on spot, 1 on on-demand)"
+kubectl -n quote get pods -o wide -l app.kubernetes.io/name=quote-api
+kubectl get nodes -L acme.io/capacity -L acme.io/node-type
+
+log "curl through ingress"
+for i in $(seq 30); do
+  curl -fsS "http://${LB}/api/quote" && echo && break
+  [ "$i" = 30 ] && { echo "ingress never answered" >&2; exit 1; }
+  sleep 2
+done
+
+echo "from the host: curl http://localhost:${HOST_PORT:-8080}/api/quote"

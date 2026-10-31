@@ -1,0 +1,34 @@
+# example workload showing what the pods must carry to use the pools above
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference
+  namespace: ai
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inference
+  template:
+    metadata:
+      labels:
+        app: inference
+      annotations:
+        # Karpenter won't voluntarily disrupt (drift, expiry) a node while this pod runs on it
+        karpenter.sh/do-not-disrupt: "true"
+    spec:
+      nodeSelector:
+        acme.io/node-type: gpu
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      # spot gives a 2-minute notice; let in-flight requests finish within that window
+      terminationGracePeriodSeconds: 110
+      containers:
+        - name: server
+          image: ghcr.io/example/inference:1.0.0
+          resources:
+            limits:
+              nvidia.com/gpu: 1
