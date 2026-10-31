@@ -1,4 +1,4 @@
-# Part 3 — Troubleshooting
+# Part 3: Troubleshooting
 
 `troubleshoot/broken-app.yaml` had **9 independent faults** across the `web` Deployment, its Service,
 the `ai-inference` Deployment and the NetworkPolicy setup. Most hide behind the one in front of them

@@ -1,4 +1,4 @@
-# Part 4 — GitLab CI → GitHub Actions
+# Part 4: GitLab CI → GitHub Actions
 
 Legacy: `ci/legacy.gitlab-ci.yml`. New: `.github/workflows/ci.yml`.
 I migrated the *intent* (test → scan → build → deploy), not the file.
@@ -16,18 +16,20 @@ I migrated the *intent* (test → scan → build → deploy), not the file.
 | Push only `:latest` | `:sha-<short>` (immutable, deployed) + `:latest` (convenience) | `latest` can't be rolled back or audited |
 | `deploy_prod`: manual `kubectl set image` with a long-lived kubeconfig secret | `bump-chart` job commits the new tag to `chart/values.yaml`; ArgoCD syncs it | CI never holds cluster credentials; git is the deploy log; rollback = `git revert` |
 | `only: master` everywhere | `pull_request` runs test/scan/build (no push); `push` to `main` also publishes | Problems surface in review, not after merge. (`only:` is deprecated in GitLab too, in favor of `rules:`) |
-| — | Trivy gate on fixable HIGH/CRITICAL in the image (bonus) | Catches vulnerable base images and Go stdlib versions before publishing. Runs the checksum-verified release binary, not the (once hijacked) action or the Alpine-based image |
-| — | `terraform fmt/validate` + `helm lint` | Cheap checks for the other code in the repo |
-| — | Explicit `permissions:` per job (default `contents: read`) | Least privilege for `GITHUB_TOKEN`; only the image job can write packages and only bump-chart can push |
+| (new) | Trivy gate on fixable HIGH/CRITICAL in the image (bonus) | Catches vulnerable base images and Go stdlib versions before publishing. Runs the checksum-verified release binary, not the (once hijacked) action or the Alpine-based image |
+| (new) | `terraform fmt/validate` + `helm lint` | Cheap checks for the other code in the repo |
+| (new) | Explicit `permissions:` per job (default `contents: read`) | Least privilege for `GITHUB_TOKEN`; only the image job can write packages and only bump-chart can push |
 
 Skipped: cosign signing (bonus). Keyless signing is a few lines, but nothing verifies signatures in this
 cluster (no admission policy), so it would be decoration as well.
 
 ## Migrating GitLab CI variables/secrets in a real project
 
-1. **Inventory**: export project, group and instance variables (`GET /projects/:id/variables`, `/groups/:id/variables`), noting `protected`/`masked`/environment scope for each.
-2. **Drop what OIDC replaces**: cloud keys (AWS/GCP/Azure) become OIDC federation with short-lived role credentials; registry passwords become `GITHUB_TOKEN` for GHCR. Then revoke the old keys.
-3. **Map scope**: group variables → organization secrets restricted to selected repos; protected/env-scoped variables → **environment secrets** with protection rules (required reviewers, branch restrictions), the closest match to GitLab's protected + `when: manual`.
-4. **Non-secret config** → GitHub `vars` (configuration variables), not secrets, so they stay readable in logs.
-5. **Rotate on cutover**: anything that lived in GitLab gets a new value in GitHub; the old one is revoked after the first green run. Never copy-paste live values through chat or tickets.
-6. Load with `gh secret set NAME --env production < file` from a secure workstation. Never echo secrets in a workflow.
+1. **Make a list of all variables.** Export the project, group and instance variables (`GET /projects/:id/variables`, `GET /groups/:id/variables`). Record the `protected` flag, the `masked` flag and the environment scope of each variable.
+2. **Remove the keys that OIDC replaces.** Replace cloud keys (AWS, GCP, Azure) with OIDC federation and short-lived role credentials. Replace registry passwords with `GITHUB_TOKEN` for GHCR. Then revoke the old keys.
+3. **Map the scope of each secret.**
+   - Put group variables into organization secrets. Limit them to the necessary repositories.
+   - Put protected or environment-scoped variables into environment secrets. Add protection rules (required reviewers, branch limits). This is the nearest equivalent to a GitLab protected variable with `when: manual`.
+4. **Keep configuration that is not secret in GitHub `vars`.** Do not put it in secrets. Values in `vars` stay readable in the logs.
+5. **Rotate each secret at cutover.** Give each secret a new value in GitHub. Revoke the old value after the first successful run. Do not send live values through chat or tickets.
+6. **Load the secrets from a secure workstation.** Use `gh secret set NAME --env production < file`. Do not print secrets in a workflow.

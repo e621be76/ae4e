@@ -1,4 +1,4 @@
-# Part 5a — Karpenter for GPU inference
+# Part 5a: Karpenter for GPU inference
 
 API: `karpenter.sh/v1` NodePool and `karpenter.k8s.aws/v1` EC2NodeClass, checked against the
 **v1.15.1** CRDs (latest release when written). `scripts/51-validate-karpenter.sh` installs those CRDs into

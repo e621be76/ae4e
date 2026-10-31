@@ -1,4 +1,4 @@
-# Part 7 — Ops Answers
+# Part 7: Ops Answers
 
 ## 1. EKS 1.33 → 1.35, zero downtime
 
@@ -9,7 +9,7 @@ so nodes can stay on 1.33 until the control plane reaches 1.35 and then roll **o
 2. **Control plane** 1.33 → 1.34 (in-place, API stays available; clients may see brief reconnects).
 3. **Add-ons** to the 1.34-compatible versions: vpc-cni first, then kube-proxy (never newer than the control plane), CoreDNS, EBS/EFS CSI.
 4. Repeat 2–3 for **1.35**.
-5. **Data plane**: Karpenter — bump the EC2NodeClass AMI alias; drift replaces nodes within the disruption budgets. Managed node groups — surge update. Spot pools first, on-demand and stateful last.
+5. **Data plane**: with Karpenter, bump the EC2NodeClass AMI alias; drift replaces nodes within the disruption budgets. With managed node groups, do a surge update. Spot pools first, on-demand and stateful last.
 6. Bump cluster-scoped tooling and remove the deprecated-API shims.
 
 **Top 3 risks**
@@ -24,7 +24,7 @@ Page on **user impact**, not on a node going away. Spot nodes disappearing is ex
 - **Handle the interruption properly:** Karpenter's interruption queue (or the Node Termination Handler) cordons and drains on the 2-minute notice, so the node leaves cleanly and the Node object is deleted. That alone removes most "unreachable" noise.
 - **Split by capacity type:** `KubeNodeUnreachable` for `acme.io/capacity=on-demand` (and control-plane-critical nodes) still pages, after `for: 5m`. For spot: inhibit via Alertmanager when a `SpotInterruptionReceived` alert (from the Karpenter/NTH metric) exists for the same node; otherwise route to a **ticket** with `for: 15m` (a reclaimed node is normally deleted well within that).
 - **Symptom alerts that page regardless of cause:** SLO burn rate (error ratio / latency), `kube_deployment_status_replicas_unavailable > 0 for 10m` on tier-1 services, pods `Pending` > 10m (no capacity to replace), and a **fleet-level** alert like ">30% of spot capacity lost in 10 min" (AZ/market event).
-- Result: a single reclaim generates no page; a real failure — an on-demand node down, replicas not recovering, users affected — still pages.
+- Result: a single reclaim generates no page; a real failure (an on-demand node down, replicas not recovering, users affected) still pages.
 
 ## 3. Cloudflare in front, mobile LCP 5s
 

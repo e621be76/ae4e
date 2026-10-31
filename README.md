@@ -1,22 +1,22 @@
-# quote-api — DevOps take-home
+# quote-api: DevOps take-home
 
 A small Go API, shipped to GHCR by GitHub Actions and deployed by ArgoCD onto a local 4-agent k3d cluster
 that simulates spot / on-demand / GPU nodepools.
 
 ## Quick start
 
-Needs only Docker (with Compose v2) and ~6 GB free RAM.
+You must have Docker with Compose v2. You must have 6 GB of free memory.
 
 ```bash
 git clone <this-repo> && cd <this-repo>
 docker compose up -d        # builds the toolbox, creates the k3d cluster, runs troubleshoot/prepare.sh
-./scripts/run-all.sh        # every task script in order, ends with a curl from the host
+./scripts/run-all.sh        # runs all task scripts in sequence, then does a curl from the host
 curl http://localhost:8080/api/quote
 ./scripts/99-teardown.sh    # removes the cluster and the toolbox
 ```
 
-Scripts can be run from the host (they re-exec themselves inside the toolbox via `docker compose exec`)
-or from inside it (`docker compose exec toolbox bash`).
+You can start the scripts from the host. Each script then runs itself in the toolbox with `docker compose exec`.
+You can also start the scripts in the toolbox shell (`docker compose exec toolbox bash`).
 
 ## Architecture
 
@@ -97,7 +97,16 @@ The toolbox drives the host's Docker daemon through the socket, so the k3d nodes
 
 ## Troubleshooting on the reviewer's machine
 
-- **Port 8080 already in use:** `HOST_PORT=18080 docker compose up -d` (and `HOST_PORT=18080 ./scripts/run-all.sh`). The port is fixed when the cluster is created; run `99-teardown.sh` first if one already exists.
-- **Not enough memory / pods Pending:** 5 k3s nodes + ArgoCD need ~4–6 GB. On Docker Desktop raise the VM memory (Settings → Resources).
-- **Docker socket not at `/var/run/docker.sock`** (rootless Docker, Colima, Podman): point the volume at your socket, e.g. `~/.colima/default/docker.sock`. Apple Silicon works as is: the toolbox and app images are multi-arch.
-- **Bootstrap failed:** `docker compose logs toolbox`; re-run with `./scripts/00-cluster.sh`.
+- **Port 8080 is in use.**
+  1. Run `./scripts/99-teardown.sh` if a cluster exists. The cluster keeps the port that it got at creation.
+  2. Run `HOST_PORT=18080 docker compose up -d`.
+  3. Run `HOST_PORT=18080 ./scripts/run-all.sh`.
+- **Pods stay Pending, or the system is slow.** The 5 k3s nodes and ArgoCD use 4 to 6 GB of memory.
+  1. On Docker Desktop, open Settings > Resources.
+  2. Increase the memory to a minimum of 6 GB.
+- **The Docker socket is not at `/var/run/docker.sock`** (rootless Docker, Colima or Podman).
+  1. In `docker-compose.yml`, change the socket volume to the path of your socket. For example: `~/.colima/default/docker.sock`.
+- **Apple Silicon.** No action is necessary. The toolbox builds for the host architecture and the app image is multi-arch.
+- **The bootstrap failed.**
+  1. Run `docker compose logs toolbox` and read the error.
+  2. Run `./scripts/00-cluster.sh` to try the bootstrap again.
