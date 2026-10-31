@@ -90,8 +90,9 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           # immutable sha-<short> tag is what gets deployed; latest is only a convenience
+          # priority makes the sha tag the `version` output (raw tags outrank sha by default)
           tags: |
-            type=sha,prefix=sha-
+            type=sha,prefix=sha-,priority=1000
             type=raw,value=latest,enable={{is_default_branch}}
       - name: build for scan
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
