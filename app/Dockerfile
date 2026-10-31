@@ -1,5 +1,5 @@
 # build natively on the runner arch and cross-compile, avoids slow qemu emulation for arm64
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src

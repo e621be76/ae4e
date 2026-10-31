@@ -102,10 +102,16 @@ jobs:
           tags: quote-api:scan
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # release binary (checksum-pinned) instead of the alpine-based aquasec/trivy image or the hijacked trivy-action
       - name: trivy (fail on fixable HIGH/CRITICAL)
-        run: >
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.1
-          image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress quote-api:scan
+        env:
+          TRIVY_VERSION: 0.76.1
+          TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
+        run: |
+          curl -fsSLo trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tgz" | sha256sum -c -
+          tar -xzf trivy.tgz trivy
+          ./trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress quote-api:scan
       - if: github.event_name == 'push'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:

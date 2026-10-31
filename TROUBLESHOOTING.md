@@ -49,7 +49,7 @@ these manifests constrains `web`, so the control plane is fair game. Harmless he
   "docker.io/library/nginx:1.25.99": failed to resolve reference ...
   ```
 - **Root cause:** `nginx:1.25.99` was never published (the 1.25 line ended at 1.25.5).
-- **Fix:** an existing, pinned tag, `nginx:1.29.8-alpine` (checked on Docker Hub), not `latest`, so the fix is reproducible.
+- **Fix:** an existing, pinned tag, `nginx:1.29.8-trixie` (checked on Docker Hub), not `latest`, so the fix is reproducible.
 
 ### 3. Probes check the wrong port
 - **Symptom:** the container starts, never becomes Ready, restarts every few seconds, then `CrashLoopBackOff`.

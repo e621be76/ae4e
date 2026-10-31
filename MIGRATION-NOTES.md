@@ -16,7 +16,7 @@ I migrated the *intent* (test → scan → build → deploy), not the file.
 | Push only `:latest` | `:sha-<short>` (immutable, deployed) + `:latest` (convenience) | `latest` can't be rolled back or audited |
 | `deploy_prod`: manual `kubectl set image` with a long-lived kubeconfig secret | `bump-chart` job commits the new tag to `chart/values.yaml`; ArgoCD syncs it | CI never holds cluster credentials; git is the deploy log; rollback = `git revert` |
 | `only: master` everywhere | `pull_request` runs test/scan/build (no push); `push` to `main` also publishes | Problems surface in review, not after merge. (`only:` is deprecated in GitLab too, in favor of `rules:`) |
-| — | Trivy gate on fixable HIGH/CRITICAL in the image (bonus) | Catches vulnerable base images and Go stdlib versions before publishing. Run from the pinned `aquasec/trivy` image, not the action |
+| — | Trivy gate on fixable HIGH/CRITICAL in the image (bonus) | Catches vulnerable base images and Go stdlib versions before publishing. Runs the checksum-verified release binary, not the (once hijacked) action or the Alpine-based image |
 | — | `terraform fmt/validate` + `helm lint` | Cheap checks for the other code in the repo |
 | — | Explicit `permissions:` per job (default `contents: read`) | Least privilege for `GITHUB_TOKEN`; only the image job can write packages and only bump-chart can push |
 
