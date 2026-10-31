@@ -31,6 +31,15 @@ bootstrap() {
 
   log "preparing nodepools"
   sh /work/troubleshoot/prepare.sh
+
+  log "making the ingress controller survive a node drain"
+  kubectl apply -f /work/cluster/traefik-ha.yaml
+  # helm-controller upgrades traefik asynchronously; wait until both replicas exist and are ready
+  for _ in $(seq 60); do
+    [ "$(kubectl -n kube-system get deploy traefik -o jsonpath='{.status.readyReplicas}' 2>/dev/null)" = 2 ] && break
+    sleep 5
+  done
+  kubectl -n kube-system rollout status deploy/traefik --timeout=120s
 }
 
 if [ "${1:-}" = "--serve" ]; then

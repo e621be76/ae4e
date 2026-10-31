@@ -56,7 +56,7 @@ The toolbox drives the host's Docker daemon through the socket, so the k3d nodes
 
 | Script | What it does | When |
 |---|---|---|
-| `00-cluster.sh` | Creates k3d (1 server + 4 agents, k3s v1.36), writes the kubeconfig, runs `troubleshoot/prepare.sh` | automatically on `docker compose up`; safe to re-run |
+| `00-cluster.sh` | Creates k3d (1 server + 4 agents, k3s v1.36), writes the kubeconfig, runs `troubleshoot/prepare.sh`, makes Traefik HA | automatically on `docker compose up`; safe to re-run |
 | `20-deploy.sh` | Installs ArgoCD (Helm), applies the `Application` pointing at this repo's `chart/`, waits for Healthy, curls the ingress | after bootstrap |
 | `25-reclaim-drill.sh` | Drains a spot node running the app while a curl loop hits the ingress, shows pods moving, uncordons; fails on any non-200 or if no replica stays on on-demand | after 20 |
 | `30-troubleshoot.sh` | Applies `broken-app.yaml` (fresh cluster only), then `fixed-app.yaml`, then runs `troubleshoot/verify.sh` | any time after bootstrap |
@@ -67,7 +67,7 @@ The toolbox drives the host's Docker daemon through the socket, so the k3d nodes
 
 ## Repo map
 
-`app/` Go service + Dockerfile · `chart/` Helm chart · `argocd/` Application · `troubleshoot/` Part 3 (provided + `fixed-app.yaml`) ·
+`app/` Go service + Dockerfile · `chart/` Helm chart · `argocd/` Application · `cluster/` cluster add-on config · `troubleshoot/` Part 3 (provided + `fixed-app.yaml`) ·
 `.github/workflows/ci.yml` Part 4 · `terraform/` Part 5b · `karpenter/` Part 5a ·
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) · [MIGRATION-NOTES.md](MIGRATION-NOTES.md) · [OPS-ANSWERS.md](OPS-ANSWERS.md) · [AI-USAGE.md](AI-USAGE.md)
 
@@ -86,7 +86,10 @@ The toolbox drives the host's Docker daemon through the socket, so the k3d nodes
 - **No `replicas` in the Deployment:** the HPA owns it, so ArgoCD's self-heal doesn't fight the autoscaler.
 - **GitOps image flow:** CI pushes `sha-<short>` and commits that tag into `chart/values.yaml` (`[skip ci]`). The Application tracks the branch, so a deploy is a git commit and a rollback is a revert. ArgoCD Image Updater would remove the bot commit; skipped as one more controller.
 - **The Application's repo URL is taken from the clone's `origin`**, so a fork deploys its own chart without edits (override with `REPO_URL=`).
-- **Toolbox is built locally by compose**, not pulled: one less image to publish and version; the cost is a ~1 min first build.
+- **Ingress HA (found by the drill):** k3s ships Traefik as 1 replica with no PDB. When the drill drained the spot node that hosted Traefik, every request failed. `cluster/traefik-ha.yaml` (a k3s HelmChartConfig) sets 2 replicas on different hosts, a PDB with `minAvailable: 1`, and a 5 s accept grace on shutdown. The drill now passes when it drains a Traefik node.
+- **Toolbox is built locally by compose**, not pulled: one less image to publish and version. The cost is a first build of about 1 min.
+- **Toolbox size:** multi-stage build. A Debian stage downloads each tool and checks its sha256. The final `debian:trixie-slim` stage gets only the binaries plus `curl`. No git (the deploy script reads `.git/config` directly) and no jq. Image content went from 543 MB to 448 MB (compressed pull 178 MB to 148 MB); the rest is the required binaries. UPX would halve that but adds decompression on every `kubectl`/`terraform` call, so it was rejected.
+- **No Alpine anywhere I control:** musl's resolver acts differently from glibc in Kubernetes DNS. The app runs on `distroless/static-debian13`; build stages and the toolbox use Debian trixie.
 - **Cut:** observability stack (Part 6 not chosen), cosign signing, OpenTelemetry tracing, AWS production diagram, ArgoCD UI exposure (`kubectl -n argocd get applications` shows the state).
 
 ## Issues found in the provided files

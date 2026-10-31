@@ -5,8 +5,11 @@
 wait_bootstrap
 
 # the Application must point at a public repo; default to the origin of this clone (https form)
-REPO_URL=${REPO_URL:-$(git -C /work remote get-url origin 2>/dev/null | sed -E 's#^git@([^:]+):#https://\1/#' || true)}
-REVISION=${REVISION:-$(git -C /work rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)}
+# read .git directly so the toolbox doesn't need git (+100 MB with perl)
+REPO_URL=${REPO_URL:-$(awk '/^\[remote "origin"\]/{f=1; next} /^\[/{f=0} f && $1 == "url" {print $3}' /work/.git/config 2>/dev/null \
+  | sed -E 's#^git@([^:]+):#https://\1/#' || true)}
+# branch name, or the commit sha on a detached HEAD (ArgoCD accepts both)
+REVISION=${REVISION:-$(sed 's#^ref: refs/heads/##' /work/.git/HEAD 2>/dev/null || echo HEAD)}
 [ -n "$REPO_URL" ] || { echo "no git remote 'origin' found; set REPO_URL=https://github.com/<you>/<repo>" >&2; exit 1; }
 
 log "installing ArgoCD"

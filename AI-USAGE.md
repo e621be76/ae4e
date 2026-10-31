@@ -44,6 +44,10 @@
   just the green checkmark. Fixed with `priority=1000` on the sha tag; the next run committed `sha-043bab2`.
 - **First CI run was red on the AI's own Karpenter example**, a Deployment with no `securityContext` (writable root filesystem, root user).
   The gate did its job, and the example now shows the hardened pod spec with `emptyDir` scratch space.
+- **The reclaim drill passed by luck twice.** The first two drills passed. After the toolbox was rebuilt, the same drill failed with 51 of 61
+  requests reset. The cause was not the toolbox: k3s runs Traefik as a single replica with no PDB, and this time it happened to be on the drained
+  spot node. The AI had treated the ingress path as given. Fix: a k3s HelmChartConfig with 2 replicas, a PDB and a shutdown grace period. I re-ran the drill 3 times,
+  2 of them draining a Traefik node, with 0 failures. Lesson: a passing drill proves little unless you know what it drained.
 - **Semgrep can't parse Helm templates.** The first scan reported the chart as "syntax errors" and silently scanned nothing in it. Now CI scans the
   rendered chart, verified by injecting `privileged: true` and confirming the job fails.
 - **One false positive suppressed on purpose:** `math/rand` for picking a quote. Annotated `nosemgrep` with the reason rather than switching to
