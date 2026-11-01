@@ -10,16 +10,17 @@ resource "cloudflare_dns_record" "quote_api" {
 
 # adopt the record someone created by hand in the dashboard; after the first apply this block can be deleted
 import {
-  to = cloudflare_dns_record.www
+  to = cloudflare_dns_record.legacy
   id = "${var.zone_id}/${var.legacy_record_id}"
 }
 
-resource "cloudflare_dns_record" "www" {
+# every attribute mirrors the live record, so the import adopts it without changing it
+resource "cloudflare_dns_record" "legacy" {
   zone_id = var.zone_id
-  name    = "www.${var.zone_name}"
-  type    = "CNAME"
+  name    = coalesce(var.legacy_record_name, "www.${var.zone_name}")
+  type    = var.legacy_record_type
   content = var.legacy_record_content
-  proxied = true
+  proxied = var.legacy_record_proxied
   ttl     = 1
 }
 

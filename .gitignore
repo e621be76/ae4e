@@ -4,3 +4,8 @@ ASSIGNMENTS.md
 CLAUDE.md
 .terraform/
 *.tfstate*
+# never commit credentials or plans that can carry them
+*.tfvars
+*.tfplan
+.env*
+*CRED*
