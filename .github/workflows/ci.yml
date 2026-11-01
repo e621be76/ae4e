@@ -9,7 +9,7 @@ on:
       - app/**
       - chart/**
       - terraform/**
-      - .github/workflows/ci.yml
+      - .github/workflows/**
       - .semgrepignore
 
 # least privilege by default, jobs widen it only where needed
